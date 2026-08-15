@@ -1,0 +1,1314 @@
+<!--
+  © Aviral Narayan, 2026. All rights reserved.
+  Shared for review purposes only — not for redistribution or reuse without permission.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GRID // LIGHTCYCLE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cyan: #4df3ff;
+    --orange: #ff8a1e;
+    --void: #050810;
+  }
+  *{ box-sizing: border-box; }
+  html,body{
+    margin:0; padding:0; width:100%; height:100%; overflow:hidden;
+    background: var(--void);
+    font-family: 'Rajdhani', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #canvas-wrap{ position:fixed; inset:0; }
+  canvas{ display:block; width:100%; height:100%; }
+
+  .glowtext{
+    font-family:'Orbitron', sans-serif;
+    color: var(--cyan);
+    text-shadow: 0 0 6px var(--cyan), 0 0 18px rgba(77,243,255,0.6), 0 0 40px rgba(77,243,255,0.3);
+    letter-spacing: 3px;
+  }
+  .glowtext.orange{
+    color: var(--orange);
+    text-shadow: 0 0 6px var(--orange), 0 0 18px rgba(255,138,30,0.6), 0 0 40px rgba(255,138,30,0.3);
+  }
+
+  #hud{
+    position:fixed; top:0; left:0; right:0; padding: 18px 26px;
+    display:flex; justify-content:space-between; align-items:flex-start;
+    pointer-events:none; z-index:5;
+  }
+  #hud .stat{ font-size: 14px; letter-spacing:2px; opacity:0.85; }
+  #hud .statval{ font-size: 30px; font-weight:700; }
+  #rivals-list{ text-align:right; font-size:13px; letter-spacing:2px; line-height:1.6; }
+  .rival-row{ opacity:0.4; transition: opacity .3s; }
+  .rival-row.dead{ text-decoration: line-through; color:#ff3b3b; text-shadow:0 0 8px rgba(255,59,59,.7); opacity:0.6;}
+  .rival-row.alive{ opacity: 1; }
+
+  #overlay{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; z-index:10; text-align:center;
+    background: radial-gradient(ellipse at center, rgba(5,8,16,0.55) 0%, rgba(2,3,7,0.92) 75%);
+    backdrop-filter: blur(2px);
+  }
+  #overlay.hidden{ display:none; }
+  #overlay h1{
+    font-size: clamp(38px,7vw,84px); margin:0 0 6px 0; font-weight:900;
+  }
+  #overlay h2{
+    font-size: clamp(14px,2.2vw,20px); font-weight:500; margin:0 0 34px 0;
+    color:#8fb9c2; letter-spacing:6px; text-transform:uppercase;
+  }
+  .btn{
+    font-family:'Orbitron', sans-serif;
+    background: transparent;
+    border: 2px solid var(--cyan);
+    color: var(--cyan);
+    padding: 14px 46px;
+    font-size: 16px;
+    letter-spacing: 4px;
+    cursor: pointer;
+    text-transform:uppercase;
+    box-shadow: 0 0 12px rgba(77,243,255,0.35), inset 0 0 12px rgba(77,243,255,0.15);
+    transition: all .15s ease;
+    pointer-events: auto;
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  }
+  .btn:hover{ background: rgba(77,243,255,0.12); box-shadow: 0 0 24px rgba(77,243,255,0.7), inset 0 0 18px rgba(77,243,255,0.25); }
+  .btn:active{ transform: scale(0.97); }
+
+  .diff-select{
+    display:flex; gap:14px; justify-content:center; margin-bottom: 6px;
+  }
+  .mode-select{
+    display:flex; gap:14px; justify-content:center; margin-bottom: 18px;
+  }
+  .mode-btn{
+    padding: 10px 26px; font-size: 13px;
+  }
+  .mode-btn.active{
+    background: rgba(77,243,255,0.2);
+    box-shadow: 0 0 22px rgba(77,243,255,0.8), inset 0 0 14px rgba(77,243,255,0.3);
+  }
+  #split-divider{
+    position:fixed; background: rgba(77,243,255,0.5); box-shadow:0 0 12px rgba(77,243,255,0.7);
+    z-index:6; display:none; pointer-events:none;
+  }
+  .players-select{
+    display:flex; gap:16px; align-items:center; justify-content:center; margin-bottom: 20px;
+  }
+  .players-label{ font-size:13px; letter-spacing:3px; color:#8fb9c2; }
+  .stepper-btn{
+    padding: 8px 18px; font-size: 18px; line-height:1;
+  }
+  .players-count{
+    font-size: 26px; min-width: 34px; display:inline-block; text-align:center;
+  }
+  .diff-btn{
+    padding: 12px 28px; font-size: 14px;
+  }
+  .diff-btn[data-diff="easy"]{ border-color:#8bff4d; color:#8bff4d; box-shadow:0 0 12px rgba(139,255,77,0.35), inset 0 0 12px rgba(139,255,77,0.15); }
+  .diff-btn[data-diff="easy"]:hover{ background: rgba(139,255,77,0.12); box-shadow:0 0 24px rgba(139,255,77,0.7), inset 0 0 18px rgba(139,255,77,0.25); }
+  .diff-btn[data-diff="hard"]{ border-color:#ff3b3b; color:#ff3b3b; box-shadow:0 0 12px rgba(255,59,59,0.35), inset 0 0 12px rgba(255,59,59,0.15); }
+  .diff-btn[data-diff="hard"]:hover{ background: rgba(255,59,59,0.12); box-shadow:0 0 24px rgba(255,59,59,0.7), inset 0 0 18px rgba(255,59,59,0.25); }
+
+  #instructions{
+    margin-top: 30px; font-size: 14px; color:#6f8f97; letter-spacing:2px; line-height:2;
+  }
+  #instructions b{ color: var(--cyan); }
+
+  #resultwrap{ display:flex; flex-direction:column; align-items:center; }
+  #resulttime{ font-size: clamp(50px,9vw,110px); font-weight:900; margin: 6px 0 2px 0; }
+  #resultsub{ font-size:14px; letter-spacing:4px; color:#8fb9c2; margin-bottom:30px;}
+
+  #touch-controls{
+    position:fixed; bottom:26px; left:0; right:0; display:none;
+    justify-content:space-between; align-items:flex-end; padding:0 26px; z-index:6; pointer-events:none;
+  }
+  .tbtn{
+    width:84px; height:84px; border-radius:50%;
+    border:2px solid var(--cyan); background: rgba(6,14,22,0.55);
+    color:var(--cyan); font-family:'Orbitron'; font-size:26px;
+    display:flex; align-items:center; justify-content:center;
+    pointer-events:auto; box-shadow:0 0 16px rgba(77,243,255,0.4);
+    user-select:none;
+  }
+  .tbtn:active{ background: rgba(77,243,255,0.3); }
+  .steer-group{
+    display:flex; flex-direction:row; gap:14px; pointer-events:none;
+  }
+  .throttle-group{
+    display:flex; flex-direction:column; gap:12px; pointer-events:none;
+  }
+  .tbtn-sm{
+    width:60px; height:60px; font-size:20px;
+  }
+  .tbtn-sm#btn-brake{ border-color: var(--orange); color: var(--orange); box-shadow:0 0 16px rgba(255,138,30,0.4); }
+  .tbtn-sm#btn-brake:active{ background: rgba(255,138,30,0.3); }
+
+  @media (max-width: 820px), (max-height: 500px) and (pointer: coarse){
+    #touch-controls{ display:flex; }
+  }
+
+  #vignette{
+    position:fixed; inset:0; pointer-events:none; z-index:4;
+    box-shadow: inset 0 0 160px 40px rgba(0,0,0,0.85);
+  }
+
+  #scanlines{
+    position:fixed; inset:0; pointer-events:none; z-index:4; opacity:0.05;
+    background: repeating-linear-gradient(0deg, #fff 0px, #fff 1px, transparent 1px, transparent 3px);
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap"></div>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+<div id="split-divider"></div>
+
+<div id="hud" style="display:none;">
+  <div class="stat">
+    <div>TIME ON GRID</div>
+    <div class="statval glowtext" id="timerval">00.0</div>
+    <div style="margin-top:6px; font-size:12px; letter-spacing:2px; opacity:0.7;" id="diffval"></div>
+    <div style="margin-top:2px; font-size:12px; letter-spacing:2px; opacity:0.7;" id="speedval"></div>
+  </div>
+  <div id="rivals-list"></div>
+</div>
+
+<div id="touch-controls">
+  <div class="steer-group">
+    <div class="tbtn" id="btn-left">◄</div>
+    <div class="tbtn" id="btn-right">►</div>
+  </div>
+  <div class="throttle-group">
+    <div class="tbtn tbtn-sm" id="btn-accel">▲</div>
+    <div class="tbtn tbtn-sm" id="btn-brake">▼</div>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="screen-start">
+    <h1 class="glowtext">GRID</h1>
+    <h2>LIGHTCYCLE PROTOCOL</h2>
+    <div class="mode-select" data-context="start">
+      <button class="btn mode-btn" data-mode="solo">Solo</button>
+      <button class="btn mode-btn" data-mode="2p">2 Player (Local)</button>
+    </div>
+    <div class="players-select">
+      <span class="players-label">PLAYERS</span>
+      <button class="btn stepper-btn players-minus" type="button">−</button>
+      <span class="glowtext players-count">6</span>
+      <button class="btn stepper-btn players-plus" type="button">+</button>
+    </div>
+    <div class="diff-select" data-context="start">
+      <button class="btn diff-btn" data-diff="easy">Easy</button>
+      <button class="btn diff-btn" data-diff="medium">Medium</button>
+      <button class="btn diff-btn" data-diff="hard">Hard</button>
+    </div>
+    <div id="instructions">
+      <b>Solo:</b>&nbsp;A/D or ◄/► steer, W/S or ▲/▼ accelerate/brake<br>
+      <b>2 Player:</b>&nbsp;P1 uses A/D/W/S &nbsp;&nbsp;|&nbsp;&nbsp; P2 uses arrow keys<br>
+      hold to carve a curve, tap for a quick swerve.<br>
+      pick a mode and 2–10 players, then a difficulty, to enter the grid.<br>
+      derezz your rivals. do not cross any light trail — but trails disintegrate after a few seconds, so the grid never fully locks up.
+    </div>
+  </div>
+
+  <div id="screen-end" style="display:none;">
+    <div id="resultwrap">
+      <h2 class="glowtext orange" id="resulttitle">DEREZZED</h2>
+      <div id="resulttime" class="glowtext">00.0<span style="font-size:0.35em;">s</span></div>
+      <div id="resultsub">OPPONENTS DEFEATED: 0</div>
+      <div class="mode-select" data-context="end">
+        <button class="btn mode-btn" data-mode="solo">Solo</button>
+        <button class="btn mode-btn" data-mode="2p">2 Player (Local)</button>
+      </div>
+      <div class="players-select">
+        <span class="players-label">PLAYERS</span>
+        <button class="btn stepper-btn players-minus" type="button">−</button>
+        <span class="glowtext players-count">6</span>
+        <button class="btn stepper-btn players-plus" type="button">+</button>
+      </div>
+      <div class="diff-select" data-context="end">
+        <button class="btn diff-btn" data-diff="easy">Easy</button>
+        <button class="btn diff-btn" data-diff="medium">Medium</button>
+        <button class="btn diff-btn" data-diff="hard">Hard</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+
+/* © Aviral Narayan, 2026. All rights reserved. Shared for review only — not for redistribution or reuse without permission. */
+
+/* ============================== CONFIG ============================== */
+const ARENA = 130;              // half-extent of arena (from -ARENA to +ARENA)
+const WALL_H = 2.6;             // trail wall height
+const WALL_T = 0.09;            // collision half-thickness for the trail (no longer a visual thickness)
+const BOUNDARY_H = 9;
+const PLAYER_BASE_SPEED = 24;   // speed the player spawns at
+const PLAYER_MIN_SPEED = 0;     // full stop
+const PLAYER_MAX_SPEED = 36;    // top speed under acceleration
+const PLAYER_ACCEL = 16;        // units/s^2 while holding accelerate
+const PLAYER_BRAKE = 30;        // units/s^2 while holding brake (stronger, so you can actually stop)
+const TURN_RATE_PLAYER = 2.5;   // radians/sec while steering held
+const BIKE_RADIUS = 1.0;
+const BIKE_TAIL_OFFSET = 1.25; // how far behind the pivot the visual model's rear actually sits — the trail should start flush with this, not the pivot
+const SEGMENT_SAMPLE_LEN = 0.55; // finalize a trail chunk every this many units traveled (finer = smoother curve)
+const RECENT_SKIP_SEGMENTS = 3; // grace: a bike can't self-collide with its own most recent segments
+const CAM_DIST = 10.5;
+const CAM_HEIGHT = 4.3;
+const LOOKAHEAD = 9;
+const LEAN_MAX = 0.4;
+const TRAIL_LIFETIME = 3.6;     // seconds a trail segment survives before it disintegrates, opening the grid back up
+
+// difficulty presets — tuned via startGame(diff), defaults below are overwritten before first spawn
+let NUM_AI_START = 5;
+let AI_SPEED_BASE = 20;
+let TURN_RATE_AI = 2.1;
+let AI_AGGRESSION = 0.35;
+let SPEED_RAMP = 0.2;
+let currentDifficulty = 'medium';
+
+const MIN_PLAYERS = 2;
+const MAX_PLAYERS = 10;
+let selectedPlayers = 6; // total bikes in the match, including you
+
+const DIFFICULTY_PRESETS = {
+  easy:   { aiSpeed: 16, aiTurn: 1.7, aggression: 0.22, ramp: 0.14, label: 'EASY'   },
+  medium: { aiSpeed: 20, aiTurn: 2.1, aggression: 0.5,  ramp: 0.20, label: 'MEDIUM' },
+  hard:   { aiSpeed: 23, aiTurn: 2.5, aggression: 0.75, ramp: 0.27, label: 'HARD'   }
+};
+
+function applyDifficulty(diff){
+  const p = DIFFICULTY_PRESETS[diff] || DIFFICULTY_PRESETS.medium;
+  currentDifficulty = diff;
+  AI_SPEED_BASE = p.aiSpeed;
+  TURN_RATE_AI = p.aiTurn;
+  AI_AGGRESSION = p.aggression;
+  SPEED_RAMP = p.ramp;
+}
+
+const COLORS = {
+  player: 0x4df3ff,
+  player2: 0xd7ff2b,
+  ai: [0xff8a1e, 0xff2fd0, 0x8bff4d, 0xffe14d, 0x9d4dff, 0xff4d4d, 0x4dffea, 0x66ccff, 0xff9d4d]
+};
+
+/* ============================== SCENE SETUP ============================== */
+const wrap = document.getElementById('canvas-wrap');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x030509);
+scene.fog = new THREE.FogExp2(0x030509, 0.014);
+
+const camera = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera.position.set(0, 30, 40);
+
+const camera2 = new THREE.PerspectiveCamera(62, window.innerWidth/window.innerHeight, 0.1, 1000);
+camera2.position.set(0, 30, 40);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true, powerPreference:'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+wrap.appendChild(renderer.domElement);
+
+window.addEventListener('resize', ()=>{
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  updateCameraAspects();
+  updateSplitDivider();
+});
+
+scene.add(new THREE.AmbientLight(0x2a4a55, 0.9));
+const dirLight = new THREE.DirectionalLight(0x6fd9ff, 0.35);
+dirLight.position.set(30, 60, -20);
+scene.add(dirLight);
+
+/* ---- Floor grid ---- */
+function buildFloor(){
+  const group = new THREE.Group();
+
+  const baseGeo = new THREE.PlaneGeometry(ARENA*2.4, ARENA*2.4, 1, 1);
+  const baseMat = new THREE.MeshBasicMaterial({ color:0x020306 });
+  const base = new THREE.Mesh(baseGeo, baseMat);
+  base.rotation.x = -Math.PI/2;
+  base.position.y = -0.05;
+  group.add(base);
+
+  const grid = new THREE.GridHelper(ARENA*2, 52, 0x0d5866, 0x0a3f4a);
+  grid.material.transparent = true;
+  grid.material.opacity = 0.55;
+  group.add(grid);
+
+  const grid2 = new THREE.GridHelper(ARENA*2, 13, 0x1fa7c2, 0x134450);
+  grid2.position.y = 0.02;
+  grid2.material.transparent = true;
+  grid2.material.opacity = 0.5;
+  group.add(grid2);
+
+  return group;
+}
+scene.add(buildFloor());
+
+/* ---- Boundary walls ---- */
+function buildBoundary(){
+  const group = new THREE.Group();
+  const mat = new THREE.MeshBasicMaterial({ color: 0xff3b1e, transparent:true, opacity:0.85 });
+  const glowMat = new THREE.MeshBasicMaterial({ color:0xff3b1e, transparent:true, opacity:0.18, blending:THREE.AdditiveBlending, depthWrite:false });
+  const positions = [
+    { x:0, z:-ARENA, rot:0, len: ARENA*2 },
+    { x:0, z: ARENA, rot:0, len: ARENA*2 },
+    { x:-ARENA, z:0, rot:Math.PI/2, len: ARENA*2 },
+    { x: ARENA, z:0, rot:Math.PI/2, len: ARENA*2 },
+  ];
+  positions.forEach(p=>{
+    const geo = new THREE.BoxGeometry(p.len, BOUNDARY_H, 0.6);
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(p.x, BOUNDARY_H/2, p.z);
+    m.rotation.y = p.rot;
+    group.add(m);
+    const gg = new THREE.Mesh(new THREE.BoxGeometry(p.len, BOUNDARY_H*1.5, 2.2), glowMat);
+    gg.position.copy(m.position);
+    gg.rotation.y = p.rot;
+    group.add(gg);
+  });
+  return group;
+}
+scene.add(buildBoundary());
+
+/* ============================== BIKE VISUAL ============================== */
+function buildBikeMesh(color){
+  const group = new THREE.Group();   // heading (yaw) pivot
+  const visual = new THREE.Group();  // lean (roll) pivot + all shapes
+  group.add(visual);
+
+  const darkMat = new THREE.MeshBasicMaterial({ color: 0x0a0d12 });
+  const glowMat = new THREE.MeshBasicMaterial({ color });
+
+  // tapered torpedo body (nose at +Z)
+  const bodyGeo = new THREE.CylinderGeometry(0.30, 0.5, 2.5, 10);
+  const body = new THREE.Mesh(bodyGeo, darkMat);
+  body.rotation.x = Math.PI/2;
+  body.position.y = 0.75;
+  visual.add(body);
+
+  // canopy / rider hump
+  const canopy = new THREE.Mesh(new THREE.SphereGeometry(0.34, 10, 8), darkMat);
+  canopy.scale.set(1, 0.7, 1.4);
+  canopy.position.set(0, 1.06, 0.0);
+  visual.add(canopy);
+
+  // side glow fins
+  const finGeo = new THREE.BoxGeometry(0.05, 0.16, 2.1);
+  const finL = new THREE.Mesh(finGeo, glowMat);
+  finL.position.set(0.4, 0.62, 0.0);
+  visual.add(finL);
+  const finR = finL.clone();
+  finR.position.set(-0.4, 0.62, 0.0);
+  visual.add(finR);
+
+  // underbody glow strip
+  const under = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.06, 2.3), glowMat);
+  under.position.set(0, 0.32, 0.0);
+  visual.add(under);
+
+  // wheels
+  const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.22, 16);
+  const wheelMat = new THREE.MeshBasicMaterial({ color: 0x0a0c10 });
+  const wf = new THREE.Mesh(wheelGeo, wheelMat);
+  wf.rotation.z = Math.PI/2;
+  wf.position.set(0, 0.5, 1.15);
+  visual.add(wf);
+  const wr = wf.clone();
+  wr.position.set(0, 0.5, -1.15);
+  visual.add(wr);
+
+  // wheel glow rings
+  const ringGeo = new THREE.TorusGeometry(0.5, 0.045, 8, 20);
+  const rf = new THREE.Mesh(ringGeo, glowMat);
+  rf.rotation.y = Math.PI/2;
+  rf.position.set(0, 0.5, 1.15);
+  visual.add(rf);
+  const rr = rf.clone();
+  rr.position.set(0, 0.5, -1.15);
+  visual.add(rr);
+
+  // nose tip
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.4, 8), glowMat);
+  nose.rotation.x = Math.PI/2;
+  nose.position.set(0, 0.78, 1.35);
+  visual.add(nose);
+
+  // handlebar hint
+  const bar = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.04, 0.05), darkMat);
+  bar.position.set(0, 1.02, 0.85);
+  visual.add(bar);
+
+  // local point light for glow
+  const pl = new THREE.PointLight(color, 1.0, 8);
+  pl.position.set(0, 0.9, -0.3);
+  visual.add(pl);
+
+  // ground glow disc
+  const discMat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.42, blending:THREE.AdditiveBlending, depthWrite:false });
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(1.4, 20), discMat);
+  disc.rotation.x = -Math.PI/2;
+  disc.position.y = 0.03;
+  visual.add(disc);
+
+  return { group, visual };
+}
+
+/* ============================== TRAIL RIBBON ==============================
+   A single continuously-growing strip mesh per bike. Every recorded point
+   contributes exactly one shared vertical edge (bottom+top vertex), and
+   consecutive edges are stitched into quads that share those vertices.
+   Because neighboring quads share real vertices (not just touching at the
+   same coordinate), there is no seam, gap, or z-fighting at bends no matter
+   how sharp the turn is — it reads as one unbroken filament. */
+class TrailRibbon{
+  constructor(color, x, z){
+    this.capacity = 128;
+    this.count = 0;
+    this.positions = new Float32Array(this.capacity*2*3);
+    this.glowPositions = new Float32Array(this.capacity*2*3);
+    this.indices = new Uint32Array(Math.max(0,(this.capacity-1))*6);
+    this._buildIndices();
+
+    this.geometry = new THREE.BufferGeometry();
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geometry.setIndex(new THREE.BufferAttribute(this.indices, 1));
+
+    this.glowGeometry = new THREE.BufferGeometry();
+    this.glowGeometry.setAttribute('position', new THREE.BufferAttribute(this.glowPositions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.glowGeometry.setIndex(new THREE.BufferAttribute(this.indices, 1));
+
+    this.mat = new THREE.MeshBasicMaterial({ color, side: THREE.DoubleSide });
+    this.mesh = new THREE.Mesh(this.geometry, this.mat);
+    this.mesh.frustumCulled = false;
+
+    this.glowMat = new THREE.MeshBasicMaterial({ color, transparent:true, opacity:0.25, blending:THREE.AdditiveBlending, depthWrite:false, side: THREE.DoubleSide });
+    this.glowMesh = new THREE.Mesh(this.glowGeometry, this.glowMat);
+    this.glowMesh.frustumCulled = false;
+
+    scene.add(this.mesh);
+    scene.add(this.glowMesh);
+
+    this.sync([{x,z}]);
+  }
+
+  _buildIndices(){
+    for(let i=0;i<this.capacity-1;i++){
+      const a=i*2, b=i*2+1, c=(i+1)*2, d=(i+1)*2+1;
+      const o=i*6;
+      this.indices[o]=a; this.indices[o+1]=b; this.indices[o+2]=c;
+      this.indices[o+3]=b; this.indices[o+4]=d; this.indices[o+5]=c;
+    }
+  }
+
+  _ensureCapacity(n){
+    if (n <= this.capacity) return;
+    let newCap = this.capacity;
+    while (newCap < n) newCap *= 2;
+    const newPos = new Float32Array(newCap*2*3); newPos.set(this.positions);
+    const newGlowPos = new Float32Array(newCap*2*3); newGlowPos.set(this.glowPositions);
+    this.positions = newPos;
+    this.glowPositions = newGlowPos;
+    this.capacity = newCap;
+    this.indices = new Uint32Array((this.capacity-1)*6);
+    this._buildIndices();
+
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.geometry.setIndex(new THREE.BufferAttribute(this.indices, 1));
+    this.glowGeometry.setAttribute('position', new THREE.BufferAttribute(this.glowPositions, 3).setUsage(THREE.DynamicDrawUsage));
+    this.glowGeometry.setIndex(new THREE.BufferAttribute(this.indices, 1));
+  }
+
+  /* Rewrites the whole strip from a live (already-pruned) list of {x,z} points.
+     Called once per frame per bike — cheap, since only the still-fresh window
+     of points (bounded by TRAIL_LIFETIME) is ever passed in. Points that have
+     aged out simply aren't in the array anymore, so the ribbon shrinks from
+     the tail end automatically: the trail disintegrates behind the bike. */
+  sync(points){
+    const n = points.length;
+    this._ensureCapacity(n);
+    for (let i=0;i<n;i++){
+      const p = points[i];
+      const base = i*2*3;
+      this.positions[base]=p.x;   this.positions[base+1]=0;       this.positions[base+2]=p.z;
+      this.positions[base+3]=p.x; this.positions[base+4]=WALL_H;  this.positions[base+5]=p.z;
+
+      this.glowPositions[base]=p.x;   this.glowPositions[base+1]=-WALL_H*0.12;  this.glowPositions[base+2]=p.z;
+      this.glowPositions[base+3]=p.x; this.glowPositions[base+4]=WALL_H*1.45;   this.glowPositions[base+5]=p.z;
+    }
+    this.count = n;
+    this.geometry.attributes.position.needsUpdate = true;
+    this.glowGeometry.attributes.position.needsUpdate = true;
+    const idxCount = Math.max(0, (n-1)*6);
+    this.geometry.setDrawRange(0, idxCount);
+    this.glowGeometry.setDrawRange(0, idxCount);
+    this.geometry.computeBoundingSphere();
+    this.glowGeometry.computeBoundingSphere();
+  }
+
+  dispose(){
+    scene.remove(this.mesh);
+    scene.remove(this.glowMesh);
+  }
+}
+
+/* ============================== BIKE CLASS ============================== */
+
+class Bike{
+  constructor(color, x, z, theta, isPlayer, playerIndex){
+    this.color = color;
+    this.isPlayer = isPlayer;
+    this.playerIndex = playerIndex || 0; // 1 or 2 for humans, 0 for AI
+    this.pos = { x, z };
+    this.theta = theta;
+    this.dir = this._dirFromTheta();
+    this.speed = isPlayer ? PLAYER_BASE_SPEED : AI_SPEED_BASE + Math.random()*3;
+    this.turnInput = 0;   // -1 left, +1 right, 0 straight (continuous steering)
+    this.lean = 0;
+    this.alive = true;
+    this.age = 0;          // this bike's own clock, used to time trail disintegration
+    this.lastPoint = { x, z };
+    const tailX = x - this.dir.x*BIKE_TAIL_OFFSET, tailZ = z - this.dir.z*BIKE_TAIL_OFFSET;
+    this.points = [{ x: tailX, z: tailZ, t: 0 }];  // visual ribbon points (dense, pruned by age)
+    this.segments = [];    // coarser collision segments {ax,az,bx,bz,t} (pruned by age)
+    this.aiDecisionTimer = 0;
+
+    const m = buildBikeMesh(color);
+    this.group = m.group;
+    this.visual = m.visual;
+    this.group.position.set(x, 0, z);
+    scene.add(this.group);
+
+    this.ribbon = new TrailRibbon(color, tailX, tailZ);
+
+    this.group.rotation.y = this.theta;
+  }
+
+  _dirFromTheta(){
+    return { x: Math.sin(this.theta), z: Math.cos(this.theta) };
+  }
+
+  _pruneExpired(){
+    const cutoff = this.age - TRAIL_LIFETIME;
+    while (this.points.length && this.points[0].t < cutoff) this.points.shift();
+    while (this.segments.length && this.segments[0].t < cutoff) this.segments.shift();
+  }
+
+  maybeFinalize(){
+    // coarser sampling used only for collision math, independent of the
+    // visual ribbon (which is updated every frame for perfect smoothness)
+    const dx = this.pos.x - this.lastPoint.x;
+    const dz = this.pos.z - this.lastPoint.z;
+    if (Math.hypot(dx,dz) >= SEGMENT_SAMPLE_LEN){
+      this.segments.push({ ax:this.lastPoint.x, az:this.lastPoint.z, bx:this.pos.x, bz:this.pos.z, t:this.age });
+      this.lastPoint = { x: this.pos.x, z: this.pos.z };
+    }
+  }
+
+  step(delta){
+    if (!this.alive) return;
+    this.age += delta;
+    const rate = this.isPlayer ? TURN_RATE_PLAYER : TURN_RATE_AI;
+    this.theta += this.turnInput * rate * delta;
+    this.dir = this._dirFromTheta();
+    this.pos.x += this.dir.x * this.speed * delta;
+    this.pos.z += this.dir.z * this.speed * delta;
+
+    this.group.position.set(this.pos.x, 0, this.pos.z);
+    this.group.rotation.y = this.theta;
+    this.points.push({ x: this.pos.x - this.dir.x*BIKE_TAIL_OFFSET, z: this.pos.z - this.dir.z*BIKE_TAIL_OFFSET, t:this.age });
+    this.maybeFinalize();
+    this._pruneExpired();
+    this.ribbon.sync(this.points);
+
+    const targetLean = -this.turnInput * LEAN_MAX;
+    this.lean += (targetLean - this.lean) * Math.min(1, delta*8);
+    this.visual.rotation.z = this.lean;
+  }
+
+  // dead bikes don't move, but their remaining trail should keep disintegrating
+  // on the same clock so the grid keeps clearing up
+  fadeTrail(delta){
+    if (this.alive) return;
+    this.age += delta;
+    this._pruneExpired();
+    this.ribbon.sync(this.points);
+  }
+
+  die(){
+    this.alive = false;
+    const dx = this.pos.x - this.lastPoint.x;
+    const dz = this.pos.z - this.lastPoint.z;
+    if (Math.hypot(dx,dz) > 0.05){
+      this.segments.push({ ax:this.lastPoint.x, az:this.lastPoint.z, bx:this.pos.x, bz:this.pos.z, t:this.age });
+    }
+    // the ribbon itself stays in the scene and keeps fading on its own —
+    // only the bike model is removed
+    explode(this.group.position, this.color);
+    scene.remove(this.group);
+  }
+}
+
+/* ============================== EXPLOSION FX ============================== */
+const explosions = [];
+function explode(pos, color){
+  const group = new THREE.Group();
+  const count = 22;
+  const geo = new THREE.BoxGeometry(0.35,0.35,0.35);
+  for(let i=0;i<count;i++){
+    const mat = new THREE.MeshBasicMaterial({ color, transparent:true });
+    const p = new THREE.Mesh(geo, mat);
+    p.position.copy(pos);
+    p.position.y = 0.6;
+    const ang = Math.random()*Math.PI*2;
+    const spd = 6 + Math.random()*10;
+    p.userData.vel = { x: Math.cos(ang)*spd, y: Math.random()*8, z: Math.sin(ang)*spd };
+    group.add(p);
+  }
+  scene.add(group);
+  explosions.push({ group, life: 0, maxLife: 1.1 });
+}
+function updateExplosions(delta){
+  for(let i=explosions.length-1;i>=0;i--){
+    const ex = explosions[i];
+    ex.life += delta;
+    const t = ex.life/ex.maxLife;
+    ex.group.children.forEach(p=>{
+      p.position.x += p.userData.vel.x*delta;
+      p.position.y += p.userData.vel.y*delta;
+      p.position.z += p.userData.vel.z*delta;
+      p.userData.vel.y -= 14*delta;
+      p.material.opacity = Math.max(0, 1-t);
+      p.scale.setScalar(Math.max(0.05,1-t));
+    });
+    if (t >= 1){
+      scene.remove(ex.group);
+      explosions.splice(i,1);
+    }
+  }
+}
+
+/* ============================== COLLISION ============================== */
+function distToSegment(px,pz, ax,az,bx,bz){
+  const dx=bx-ax, dz=bz-az;
+  const len2 = dx*dx+dz*dz;
+  if (len2 < 1e-6) return Math.hypot(px-ax,pz-az);
+  let t = ((px-ax)*dx+(pz-az)*dz)/len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px-(ax+t*dx), pz-(az+t*dz));
+}
+
+function collidesPoint(x, z, radius, skipBike){
+  if (x < -ARENA+radius || x > ARENA-radius || z < -ARENA+radius || z > ARENA-radius) return true;
+
+  const wallHalf = WALL_T/2;
+  for (const b of bikes){
+    if (!b.alive && b !== skipBike) continue;
+    const isSelf = (b === skipBike);
+    const lastIdx = b.segments.length - 1;
+    const skipFrom = isSelf ? (lastIdx - RECENT_SKIP_SEGMENTS + 1) : Infinity;
+
+    for (let i=0; i<=lastIdx; i++){
+      if (isSelf && i >= skipFrom) continue;
+      const seg = b.segments[i];
+      if (distToSegment(x,z, seg.ax,seg.az,seg.bx,seg.bz) < radius+wallHalf) return true;
+    }
+    // other bikes' still-growing wall counts; your own never does (you're standing on its tip)
+    if (b.alive && !isSelf){
+      if (distToSegment(x,z, b.lastPoint.x,b.lastPoint.z, b.pos.x,b.pos.z) < radius+wallHalf) return true;
+    }
+  }
+  return false;
+}
+
+// Used only for crediting eliminations: was this specific spot actually on
+// the given bike's own trail (not a boundary wall, not the victim's own line,
+// not some other bike's line)? Only kills caused by running into a human's
+// wall count toward "opponents defeated" — self-inflicted or rival-on-rival
+// deaths don't credit anyone.
+function hitsBikeTrail(bike, x, z, radius){
+  if (!bike || !bike.alive) return false;
+  const wallHalf = WALL_T/2;
+  for (const seg of bike.segments){
+    if (distToSegment(x,z, seg.ax,seg.az,seg.bx,seg.bz) < radius+wallHalf) return true;
+  }
+  if (distToSegment(x,z, bike.lastPoint.x,bike.lastPoint.z, bike.pos.x,bike.pos.z) < radius+wallHalf) return true;
+  return false;
+}
+
+/* ============================== GAME STATE ============================== */
+let bikes = [];
+let player1 = null;
+let player2 = null;
+let running = false;
+let gameTime = 0;
+let defeatedBy1 = 0;
+let defeatedBy2 = 0;
+let aiAliveCount = 0;
+let mode = 'solo';       // 'solo' | '2p'
+let humanCount = 1;
+
+const overlay = document.getElementById('overlay');
+const screenStart = document.getElementById('screen-start');
+const screenEnd = document.getElementById('screen-end');
+const hud = document.getElementById('hud');
+const rivalsListEl = document.getElementById('rivals-list');
+const timerEl = document.getElementById('timerval');
+const diffEl = document.getElementById('diffval');
+const speedEl = document.getElementById('speedval');
+
+function thetaFromVec(x,z){ return Math.atan2(x,z); }
+
+function spawnGame(){
+  bikes.forEach(b=>{
+    scene.remove(b.group);
+    if (b.ribbon) b.ribbon.dispose();
+  });
+  explosions.forEach(ex=>scene.remove(ex.group));
+  explosions.length = 0;
+
+  bikes = [];
+  defeatedBy1 = 0;
+  defeatedBy2 = 0;
+  gameTime = 0;
+
+  humanCount = (mode === '2p') ? 2 : 1;
+  NUM_AI_START = Math.max(0, selectedPlayers - humanCount);
+
+  const startDirs = [
+    {x:0,z:-1},{x:0,z:1},{x:1,z:0},{x:-1,z:0}
+  ];
+
+  player1 = new Bike(COLORS.player, humanCount===2 ? -9 : 0, 40, thetaFromVec(0,-1), true, 1);
+  bikes.push(player1);
+
+  if (humanCount === 2){
+    player2 = new Bike(COLORS.player2, 9, 40, thetaFromVec(0,-1), true, 2);
+    bikes.push(player2);
+  } else {
+    player2 = null;
+  }
+
+  const ringR = 46 + NUM_AI_START*4.2;
+  for (let i=0;i<NUM_AI_START;i++){
+    const ang = (i/NUM_AI_START)*Math.PI*2 + 0.6;
+    const x = Math.cos(ang)*ringR;
+    const z = Math.sin(ang)*ringR;
+    const d = startDirs[i % startDirs.length];
+    const ai = new Bike(COLORS.ai[i % COLORS.ai.length], x, z, thetaFromVec(d.x,d.z), false);
+    bikes.push(ai);
+  }
+  aiAliveCount = NUM_AI_START;
+  buildRivalsHUD();
+  const preset = DIFFICULTY_PRESETS[currentDifficulty] || DIFFICULTY_PRESETS.medium;
+  diffEl.textContent = preset.label + ' \u2022 ' + selectedPlayers + ' PLAYERS' + (humanCount===2 ? ' \u2022 2P LOCAL' : '');
+}
+
+function buildRivalsHUD(){
+  rivalsListEl.innerHTML = '<div style="opacity:.6;margin-bottom:4px;">RIVAL PROGRAMS</div>' +
+    bikes.filter(b=>!b.isPlayer).map((b,i)=>`<div class="rival-row alive" id="rival-${i}" style="color:${'#'+b.color.toString(16).padStart(6,'0')}">PRGM_0${i+1}</div>`).join('');
+}
+
+function endGame(won){
+  running = false;
+  hud.style.display = 'none';
+  overlay.classList.remove('hidden');
+  screenStart.style.display = 'none';
+  screenEnd.style.display = 'block';
+  updateSplitDivider();
+
+  let title = won ? 'VICTORY' : 'GAME OVER';
+  if (humanCount === 2 && NUM_AI_START === 0){
+    // pure duel with no AI: whoever's left standing wins outright
+    if (player1.alive && !player2.alive) title = 'PLAYER 1 WINS';
+    else if (player2.alive && !player1.alive) title = 'PLAYER 2 WINS';
+  }
+  document.getElementById('resulttitle').textContent = title;
+  document.getElementById('resulttitle').className = won ? 'glowtext' : 'glowtext orange';
+  document.getElementById('resulttime').textContent = gameTime.toFixed(1) + 's';
+
+  const resultsub = document.getElementById('resultsub');
+  if (humanCount === 2){
+    resultsub.textContent = 'P1 DEFEATED ' + defeatedBy1 + '   \u2022   P2 DEFEATED ' + defeatedBy2;
+  } else {
+    resultsub.textContent = 'OPPONENTS DEFEATED: ' + defeatedBy1;
+  }
+}
+
+/* ============================== AI LOGIC ============================== */
+const AI_SCAN_ANGLES = [0, -0.2, 0.2, -0.4, 0.4, -0.65, 0.65, -0.95, 0.95, -1.3, 1.3];
+const ENGAGE_RANGE = 58; // within this distance, AI always attempts to intercept the nearest human regardless of difficulty
+const AI_MIN_SPEED = 7;       // floor while braking to escape danger — never fully stalls
+const AI_BRAKE_RATE = 26;     // units/s^2 shed while a wall is close, to tighten the turning radius
+const AI_RECOVER_ACCEL = 16;  // units/s^2 regained once the danger has cleared
+const AI_ENGAGE_ACCEL = 12;   // units/s^2 gained while safely closing in on a target
+const AI_MAX_SPEED = 34;      // cap so a pursuing AI can't outrun the arena's sense of fairness
+
+function nearestAliveHuman(b){
+  let best = null, bestD = Infinity;
+  const humans = [player1, player2];
+  for (const h of humans){
+    if (!h || !h.alive) continue;
+    const d = Math.hypot(h.pos.x - b.pos.x, h.pos.z - b.pos.z);
+    if (d < bestD){ bestD = d; best = h; }
+  }
+  return best;
+}
+
+// How far can we travel along this heading before hitting something?
+// Marches in fixed small steps rather than a few widely-spaced fractions of
+// a (possibly large) lookahead distance — with sparse sampling, a thin trail
+// wall can sit entirely between two sample points and never get detected at
+// all (classic raymarch tunneling). The step size here is kept smaller than
+// the collision hitbox radius so consecutive samples always overlap and
+// nothing can slip through, no matter how far out lookAhead reaches.
+// Step must stay <= 2x the scanning hitbox radius (AI_SCAN_RADIUS = 2.8) for
+// consecutive samples to guarantee overlapping coverage along the ray — 3.0
+// leaves a comfortable margin under that ceiling. AI_SCAN_RADIUS is deliberately
+// bigger than the bike's real collision radius: the AI should start reacting to
+// a wall well before it's actually touching it, especially since the offense
+// logic can aim it straight at where a target's trail already is.
+const AI_SCAN_STEP = 3.0;
+const AI_SCAN_RADIUS = 2.8;
+function marchRay(b, offset, maxDist){
+  const th = b.theta + offset;
+  const dx = Math.sin(th), dz = Math.cos(th);
+  let d = AI_SCAN_STEP;
+  while (d <= maxDist){
+    if (collidesPoint(b.pos.x + dx*d, b.pos.z + dz*d, AI_SCAN_RADIUS, b)) return d;
+    d += AI_SCAN_STEP;
+  }
+  return maxDist;
+}
+function angleClearance(b, offset, lookAhead){
+  return marchRay(b, offset, lookAhead);
+}
+
+function aiThink(b, delta){
+  b.aiDecisionTimer -= delta;
+  // Lookahead scales with speed AND accounts for turning radius (speed /
+  // turn rate) — a fast bike needs to spot trouble much earlier to actually
+  // have room to turn away from it, not just technically "see" it.
+  const turnRadius = b.speed / Math.max(TURN_RATE_AI, 0.5);
+  const lookAhead = Math.min(30, 12 + b.speed*0.7 + turnRadius*0.6);
+
+  const testAngle = (offset)=> marchRay(b, offset, lookAhead) < lookAhead;
+
+  // Track sustained one-directional turning. The avoidance logic below can
+  // keep re-picking "turn left" every time it's still locally clear, which
+  // traces an ever-tightening circle that eventually clips the bike's own
+  // earlier trail. If we've been carving the same way too long, force a
+  // break using the same clearance scoring as a real emergency.
+  if (b.turnInput !== 0 && b.turnInput === b._lastTurnDir){
+    b._turnStreak = (b._turnStreak || 0) + delta;
+  } else {
+    b._turnStreak = 0;
+  }
+  b._lastTurnDir = b.turnInput;
+
+  if (b._turnStreak > 1.0){
+    let bestAngle = 0, bestClear = -1;
+    for (const a of AI_SCAN_ANGLES){
+      if (a !== 0 && Math.sign(a) === Math.sign(b._lastTurnDir)) continue; // don't re-pick the direction we're stuck in
+      const c = angleClearance(b, a, lookAhead);
+      if (c > bestClear){ bestClear = c; bestAngle = a; }
+    }
+    b.turnInput = bestAngle < 0 ? -1 : (bestAngle > 0 ? 1 : 0);
+    b._turnStreak = 0;
+    b._lastTurnDir = b.turnInput;
+    b.aiDecisionTimer = 0.3 + Math.random()*0.2;
+    return;
+  }
+
+  const dangerAhead = testAngle(0);
+
+  // Emergency braking: shedding speed tightens the turning radius, giving
+  // the escape maneuver below actual room to work instead of ploughing
+  // straight through a turn that's too tight to make at full speed.
+  // Once clear, actively climb back to speed rather than relying on the
+  // slow passive difficulty ramp — otherwise a bike that braked once stays
+  // slow for the rest of the match.
+  if (dangerAhead){
+    b.speed = Math.max(AI_MIN_SPEED, b.speed - AI_BRAKE_RATE*delta);
+  } else {
+    b.speed = Math.min(AI_MAX_SPEED, b.speed + AI_RECOVER_ACCEL*delta);
+  }
+
+  if (dangerAhead || b.aiDecisionTimer <= 0){
+    if (dangerAhead){
+      // score every candidate direction by how much room it actually has
+      // and commit to the best one — not just the first "technically clear"
+      // option, so it reads as a real dodge instead of a coin flip
+      let bestAngle = 0, bestClear = -1;
+      for (const a of AI_SCAN_ANGLES){
+        if (a === 0) continue;
+        const c = angleClearance(b, a, lookAhead);
+        if (c > bestClear){ bestClear = c; bestAngle = a; }
+      }
+      b.turnInput = bestAngle < 0 ? -1 : (bestAngle > 0 ? 1 : (Math.random()<0.5?-1:1));
+      b.aiDecisionTimer = 0.12 + Math.random()*0.08; // fast reflexes, re-checks almost every frame while in danger
+    } else {
+      // safe for now: mostly cruise, but pressure the nearest human by
+      // cutting them off rather than just tailing them. Instead of steering
+      // at their current spot, aim at where they'll BE shortly — that way
+      // the trail we lay on the way there ends up crossing their path
+      // ahead of them, forcing them to react or run into it. Close range
+      // always engages this way; long range still respects the difficulty's
+      // aggression setting so easy/medium AI doesn't relentlessly chase
+      // from across the map.
+      const target = nearestAliveHuman(b);
+      let engaging = false;
+      if (target){
+        const dist = Math.hypot(target.pos.x - b.pos.x, target.pos.z - b.pos.z);
+        engaging = dist < ENGAGE_RANGE || Math.random() < AI_AGGRESSION;
+      }
+      if (target && engaging){
+        const dist = Math.hypot(target.pos.x - b.pos.x, target.pos.z - b.pos.z);
+        const leadTime = Math.min(1.8, dist / Math.max(target.speed, 1));
+        const predX = target.pos.x + target.dir.x * target.speed * leadTime;
+        const predZ = target.pos.z + target.dir.z * target.speed * leadTime;
+        const toInterceptTheta = Math.atan2(predX - b.pos.x, predZ - b.pos.z);
+        let diff = toInterceptTheta - b.theta;
+        while (diff > Math.PI) diff -= Math.PI*2;
+        while (diff < -Math.PI) diff += Math.PI*2;
+
+        // Chasing an intercept point often means aiming straight at where the
+        // target's trail already is. Check that direction before committing —
+        // if it's actually driving toward a wall, treat this exactly like an
+        // emergency instead of blindly charging into the thing we're hunting.
+        const nearTermOffset = Math.max(-0.5, Math.min(0.5, diff));
+        if (testAngle(nearTermOffset)){
+          let bestAngle = 0, bestClear = -1;
+          for (const a of AI_SCAN_ANGLES){
+            const c = angleClearance(b, a, lookAhead);
+            if (c > bestClear){ bestClear = c; bestAngle = a; }
+          }
+          b.turnInput = bestAngle < 0 ? -1 : (bestAngle > 0 ? 1 : (Math.random()<0.5?-1:1));
+          b.speed = Math.max(AI_MIN_SPEED, b.speed - AI_BRAKE_RATE*delta);
+          b.aiDecisionTimer = 0.12 + Math.random()*0.08;
+        } else {
+          b.turnInput = diff > 0.08 ? 1 : (diff < -0.08 ? -1 : 0);
+          b.aiDecisionTimer = 0.18 + Math.random()*0.15; // re-aim often while engaged — the intercept point keeps moving
+          // press the attack: push beyond base speed while it's safe to do so
+          b.speed = Math.min(AI_MAX_SPEED, b.speed + AI_ENGAGE_ACCEL*delta);
+        }
+      } else {
+        const r = Math.random();
+        b.turnInput = r < 0.32 ? -1 : (r < 0.64 ? 1 : 0);
+        b.aiDecisionTimer = 0.4 + Math.random()*0.6;
+      }
+    }
+  }
+}
+
+/* ============================== INPUT ============================== */
+// P1 always uses WASD. P2 (2-player mode only) uses the arrow keys.
+// In solo mode, the arrow keys fall back to also controlling P1, so single-
+// player controls work exactly as before.
+let keyLeft1 = false, keyRight1 = false, keyAccel1 = false, keyBrake1 = false;
+let keyLeft2 = false, keyRight2 = false, keyAccel2 = false, keyBrake2 = false;
+
+window.addEventListener('keydown', (e)=>{
+  if (e.key === 'a' || e.key === 'A') keyLeft1 = true;
+  if (e.key === 'd' || e.key === 'D') keyRight1 = true;
+  if (e.key === 'w' || e.key === 'W') keyAccel1 = true;
+  if (e.key === 's' || e.key === 'S') keyBrake1 = true;
+  if (e.key === 'ArrowLeft') keyLeft2 = true;
+  if (e.key === 'ArrowRight') keyRight2 = true;
+  if (e.key === 'ArrowUp') keyAccel2 = true;
+  if (e.key === 'ArrowDown') keyBrake2 = true;
+});
+window.addEventListener('keyup', (e)=>{
+  if (e.key === 'a' || e.key === 'A') keyLeft1 = false;
+  if (e.key === 'd' || e.key === 'D') keyRight1 = false;
+  if (e.key === 'w' || e.key === 'W') keyAccel1 = false;
+  if (e.key === 's' || e.key === 'S') keyBrake1 = false;
+  if (e.key === 'ArrowLeft') keyLeft2 = false;
+  if (e.key === 'ArrowRight') keyRight2 = false;
+  if (e.key === 'ArrowUp') keyAccel2 = false;
+  if (e.key === 'ArrowDown') keyBrake2 = false;
+});
+
+function bindTouch(id, setFn){
+  const el = document.getElementById(id);
+  const on = (ev)=>{ ev.preventDefault(); setFn(true); };
+  const off = (ev)=>{ if(ev) ev.preventDefault(); setFn(false); };
+  el.addEventListener('touchstart', on, {passive:false});
+  el.addEventListener('touchend', off, {passive:false});
+  el.addEventListener('touchcancel', off, {passive:false});
+  el.addEventListener('mousedown', on);
+  window.addEventListener('mouseup', off);
+  el.addEventListener('mouseleave', off);
+}
+// touch controls are only ever shown in solo mode, so they always drive P1
+bindTouch('btn-left', v=>keyLeft1=v);
+bindTouch('btn-right', v=>keyRight1=v);
+bindTouch('btn-accel', v=>keyAccel1=v);
+bindTouch('btn-brake', v=>keyBrake1=v);
+
+/* ============================== CAMERA ============================== */
+function makeChaseCam(cam){
+  return { cam, camTarget: new THREE.Vector3(), camLookTarget: new THREE.Vector3(), init: false };
+}
+const chaseCam1 = makeChaseCam(camera);
+const chaseCam2 = makeChaseCam(camera2);
+
+function updateChaseCam(cc, bike, delta){
+  if (!bike || !bike.alive) return;
+  const fx = bike.dir.x, fz = bike.dir.z;
+  const desiredPos = new THREE.Vector3(
+    bike.pos.x - fx*CAM_DIST,
+    CAM_HEIGHT,
+    bike.pos.z - fz*CAM_DIST
+  );
+  const desiredLook = new THREE.Vector3(
+    bike.pos.x + fx*LOOKAHEAD,
+    1.4,
+    bike.pos.z + fz*LOOKAHEAD
+  );
+
+  if (!cc.init){
+    cc.cam.position.copy(desiredPos);
+    cc.camTarget.copy(desiredPos);
+    cc.camLookTarget.copy(desiredLook);
+    cc.init = true;
+  }
+
+  const posLerp = 1 - Math.pow(0.0025, delta);
+  const lookLerp = 1 - Math.pow(0.02, delta);
+  cc.camTarget.lerp(desiredPos, posLerp);
+  cc.camLookTarget.lerp(desiredLook, lookLerp);
+  cc.cam.position.copy(cc.camTarget);
+  cc.cam.lookAt(cc.camLookTarget);
+}
+
+function updateCameraAspects(){
+  const w = window.innerWidth, h = window.innerHeight;
+  if (running && humanCount === 2){
+    const landscape = w >= h;
+    const asp = landscape ? (w/2)/h : w/(h/2);
+    camera.aspect = asp;
+    camera2.aspect = asp;
+  } else {
+    camera.aspect = w/h;
+  }
+  camera.updateProjectionMatrix();
+  camera2.updateProjectionMatrix();
+}
+
+function updateSplitDivider(){
+  const el = document.getElementById('split-divider');
+  if (!(running && humanCount === 2)){ el.style.display = 'none'; return; }
+  const w = window.innerWidth, h = window.innerHeight;
+  const landscape = w >= h;
+  el.style.display = 'block';
+  if (landscape){
+    el.style.left = (Math.floor(w/2) - 1) + 'px'; el.style.top = '0px';
+    el.style.width = '2px'; el.style.height = h + 'px';
+  } else {
+    el.style.left = '0px'; el.style.top = (Math.floor(h/2) - 1) + 'px';
+    el.style.width = w + 'px'; el.style.height = '2px';
+  }
+}
+
+
+function renderSplitScreen(){
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setScissorTest(true);
+  const landscape = w >= h;
+  if (landscape){
+    const halfW = Math.floor(w/2);
+    renderer.setViewport(0, 0, halfW, h);
+    renderer.setScissor(0, 0, halfW, h);
+    renderer.render(scene, camera);
+    renderer.setViewport(halfW, 0, w - halfW, h);
+    renderer.setScissor(halfW, 0, w - halfW, h);
+    renderer.render(scene, camera2);
+  } else {
+    const halfH = Math.floor(h/2);
+    renderer.setViewport(0, h - halfH, w, halfH);
+    renderer.setScissor(0, h - halfH, w, halfH);
+    renderer.render(scene, camera);
+    renderer.setViewport(0, 0, w, h - halfH);
+    renderer.setScissor(0, 0, w, h - halfH);
+    renderer.render(scene, camera2);
+  }
+  renderer.setScissorTest(false);
+}
+
+/* ============================== MAIN LOOP ============================== */
+const clock = new THREE.Clock();
+
+function tick(){
+  requestAnimationFrame(tick);
+  const delta = Math.min(clock.getDelta(), 0.05);
+
+  if (running){
+    gameTime += delta;
+    timerEl.textContent = gameTime.toFixed(1);
+
+    // in solo mode the arrow keys also drive P1, so single-player controls
+    // work with either scheme; in 2P mode they're P2's alone
+    const soloFallback = (humanCount === 1);
+    const eff1Left = keyLeft1 || (soloFallback && keyLeft2);
+    const eff1Right = keyRight1 || (soloFallback && keyRight2);
+    const eff1Accel = keyAccel1 || (soloFallback && keyAccel2);
+    const eff1Brake = keyBrake1 || (soloFallback && keyBrake2);
+
+    if (player1 && player1.alive){
+      player1.turnInput = (eff1Left ? 1 : 0) + (eff1Right ? -1 : 0);
+      if (eff1Accel) player1.speed = Math.min(PLAYER_MAX_SPEED, player1.speed + PLAYER_ACCEL*delta);
+      if (eff1Brake) player1.speed = Math.max(PLAYER_MIN_SPEED, player1.speed - PLAYER_BRAKE*delta);
+    }
+    if (humanCount === 2 && player2 && player2.alive){
+      player2.turnInput = (keyLeft2 ? 1 : 0) + (keyRight2 ? -1 : 0);
+      if (keyAccel2) player2.speed = Math.min(PLAYER_MAX_SPEED, player2.speed + PLAYER_ACCEL*delta);
+      if (keyBrake2) player2.speed = Math.max(PLAYER_MIN_SPEED, player2.speed - PLAYER_BRAKE*delta);
+    }
+
+    speedEl.textContent = player1 ? 'P1 SPEED ' + Math.round(player1.speed) : '';
+    if (humanCount === 2 && player2){
+      speedEl.textContent += '   P2 SPEED ' + Math.round(player2.speed);
+    }
+
+    bikes.forEach(b=>{ if (b.alive) b.step(delta); });
+    bikes.forEach(b=>{ if (!b.isPlayer && b.alive) aiThink(b, delta); });
+    bikes.forEach(b=>{ if (b.alive) b.speed += delta*SPEED_RAMP; });
+    bikes.forEach(b=>{ if (!b.alive) b.fadeTrail(delta); });
+
+    bikes.forEach(b=>{
+      if (!b.alive) return;
+      if (collidesPoint(b.pos.x, b.pos.z, BIKE_RADIUS, b)){
+        let causedBy = 0;
+        if (!b.isPlayer){
+          if (hitsBikeTrail(player1, b.pos.x, b.pos.z, BIKE_RADIUS)) causedBy = 1;
+          else if (humanCount === 2 && hitsBikeTrail(player2, b.pos.x, b.pos.z, BIKE_RADIUS)) causedBy = 2;
+        }
+        b.die();
+        if (!b.isPlayer){
+          aiAliveCount--;
+          if (causedBy === 1) defeatedBy1++;
+          else if (causedBy === 2) defeatedBy2++;
+          const idx = bikes.filter(x=>!x.isPlayer).indexOf(b);
+          const row = document.getElementById('rival-'+idx);
+          if (row){ row.classList.remove('alive'); row.classList.add('dead'); }
+        }
+      }
+    });
+
+    const humansAlive = (player1 && player1.alive ? 1 : 0) + (humanCount===2 && player2 && player2.alive ? 1 : 0);
+    if (humansAlive === 0){
+      endGame(false);
+    } else if (NUM_AI_START > 0 && aiAliveCount <= 0){
+      endGame(true);
+    } else if (NUM_AI_START === 0 && humanCount === 2 && humansAlive === 1){
+      endGame(true); // duel decided — one player outlasted the other
+    }
+  }
+
+  updateExplosions(delta);
+
+  if (running && humanCount === 2){
+    updateChaseCam(chaseCam1, player1, delta);
+    updateChaseCam(chaseCam2, player2, delta);
+    renderSplitScreen();
+  } else {
+    if (running) updateChaseCam(chaseCam1, player1, delta);
+    renderer.setScissorTest(false);
+    renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+    renderer.render(scene, camera);
+  }
+}
+
+/* ============================== UI WIRING ============================== */
+function updateTouchControlsVisibility(){
+  const tc = document.getElementById('touch-controls');
+  // touch controls only make sense for solo play; 2P is keyboard-only (split-screen)
+  tc.style.display = (humanCount === 2) ? 'none' : '';
+}
+
+function startGame(diff){
+  applyDifficulty(diff);
+  chaseCam1.init = false;
+  chaseCam2.init = false;
+  keyLeft1 = false; keyRight1 = false; keyAccel1 = false; keyBrake1 = false;
+  keyLeft2 = false; keyRight2 = false; keyAccel2 = false; keyBrake2 = false;
+  spawnGame();
+  overlay.classList.add('hidden');
+  hud.style.display = 'flex';
+  running = true;
+  updateTouchControlsVisibility();
+  updateCameraAspects();
+  updateSplitDivider();
+}
+
+document.querySelectorAll('.diff-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const diff = btn.getAttribute('data-diff');
+    screenEnd.style.display = 'none';
+    screenStart.style.display = 'block';
+    startGame(diff);
+  });
+});
+
+function updateModeDisplay(){
+  document.querySelectorAll('.mode-btn').forEach(btn=>{
+    btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+  });
+}
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    mode = btn.getAttribute('data-mode');
+    if (mode === '2p' && selectedPlayers < 2) selectedPlayers = 2;
+    updateModeDisplay();
+    updatePlayersDisplay();
+  });
+});
+updateModeDisplay();
+
+function updatePlayersDisplay(){
+  document.querySelectorAll('.players-count').forEach(el=>{ el.textContent = selectedPlayers; });
+}
+document.querySelectorAll('.players-minus').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    selectedPlayers = Math.max(MIN_PLAYERS, selectedPlayers - 1);
+    updatePlayersDisplay();
+  });
+});
+document.querySelectorAll('.players-plus').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    selectedPlayers = Math.min(MAX_PLAYERS, selectedPlayers + 1);
+    updatePlayersDisplay();
+  });
+});
+updatePlayersDisplay();
+
+function idleCameraSpin(){
+  if (running) return;
+  const t = performance.now()*0.00006;
+  camera.position.set(Math.sin(t)*70, 34, Math.cos(t)*70);
+  camera.lookAt(0,4,0);
+}
+
+clock.start();
+tick();
+setInterval(()=>{ if(!running) idleCameraSpin(); }, 16);
+
+})();
+</script>
+</body>
+</html>
